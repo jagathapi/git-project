@@ -1,0 +1,1264 @@
+Login to Alchemy Lab:
+
+URL: https://labs.alchemycloud.co.in
+ UserName: userXX 
+Password: Orange@123
+
+################################04-05-26##################################
+
+Login to Putty:
+
+IP: 192.168.209.128 
+UserName: wfuser 
+Password: wfuser 
+To become root: sudo su -
+
+###############################04-05-26###################################
+
+Terraform Install:
+
+yum install -y yum-utils               
+yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo     
+yum install -y terraform              
+terraform version
+
+################################04-05-26###################################
+
+Terraform Providers List:
+
+  https://registry.terraform.io/browse/providers
+
+#############################04-05-26######################################
+
+Access: https://atgensoft.com/training/Terraform-Vlab.xlsx
+
+#############################04-05-26######################################
+
+EC2 Instance with Terraform:
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_vm/    
+[root@master ~]# cd ec2_vm
+[root@master ec2_vm]# vi main.tf
+[root@master ec2_vm]# cat main.tf
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "6.43.0"
+    }
+  }
+}
+
+provider "aws" {
+  region     = "ap-south-1"
+  access_key = "AKIATPWBFSSPFHLZIY5F"
+  secret_key = "Zlp43JJ0WlxEnaQJgoV0vmQres651BGuaRKvrUFY"
+}
+
+resource "aws_instance" "example" {
+  ami           = "ami-07a00cf47dbbc844c"
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "sagar-vm"
+  }
+}
+
+
+[root@master ec2_vm]# terraform init                    
+[root@master ec2_vm]# terraform validate                    
+[root@master ec2_vm]# terraform plan                         
+[root@master ec2_vm]# terraform apply                        
+[root@master ec2_vm]# ls -ltr terraform.tfstate
+-rw-r--r-- 1 root root 5429 May  4 15:20 terraform.tfstate
+
+###############################04-05-26###########################################
+
+terraform state list
+terraform destroy
+
+Targeted Destroy:
+terraform destroy -target=aws_instance.example
+
+###############################04-05-26###########################################
+
+EC2 with Terraform Variables:
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_vars/         
+[root@master ~]# cd ec2_vars/
+[root@master ec2_vars]# vi vars.tf
+[root@master ec2_vars]# cat vars.tf
+variable "aws" {
+  type = map
+  default = {
+    region = "ap-south-1",
+    access_key = "AKIATPWBFSSPFHLZIY5F",
+    secret_key = "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"
+  }
+}
+
+variable "ami" {
+  default = "ami-07a00cf47dbbc844c"
+}
+
+variable "instance_type" {
+  default = "t2.micro"
+}
+
+variable "tags" {
+  default = { Name = "sagar-vm" }
+}
+
+[root@master ec2_vars]#
+[root@master ec2_vars]# vi provider.tf
+[root@master ec2_vars]# cat provider.tf
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "6.43.0"
+    }
+  }
+}
+
+provider "aws" {
+  region     = var.aws.region
+  access_key = var.aws.access_key
+  secret_key = var.aws.secret_key
+}
+[root@master ec2_vars]#
+[root@master ec2_vars]# vi main.tf
+[root@master ec2_vars]# cat main.tf
+resource "aws_instance" "example" {
+  ami           = var.ami
+  instance_type = var.instance_type
+  tags = var.tags
+}
+[root@master ec2_vars]#
+[root@master ec2_vars]# vi out.tf
+[root@master ec2_vars]# cat out.tf
+output "PublicIP" {
+  value = aws_instance.example.public_ip
+}
+[root@master ec2_vars]#
+[root@master ec2_vars]# terraform init           
+[root@master ec2_vars]# terraform validate            
+[root@master ec2_vars]# terraform plan              
+[root@master ec2_vars]# terraform apply -auto-approve       
+
+
+##########################05-05-26#########################################
+
+
+EC2 ssh with Terraform:
+
+
+[root@master ~]# ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa):
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /root/.ssh/id_rsa
+Your public key has been saved in /root/.ssh/id_rsa.pub
+The key fingerprint is:
+SHA256:FyzhDc 3 WBJ0ySS a0eB4/0nZKP78qJPfLbdplsc9A root@master
+The key's randomart image is:
+ ---[RSA 3072]---- 
+|        o .o. .  |
+|       . Bo.     |
+|        o *. ..  |
+|         .   =.  |
+|        S ..**.o.|
+|         . . ==.E|
+|           . o*.o|
+|           .=ooOo|
+|           .oBO  |
+ ----[SHA256]----- 
+[root@master ~]# ls -ltr /root/.ssh/
+total 12
+-rw------- 1 root root  568 Nov 21  2023 authorized_keys
+-rw------- 1 root root 2602 May  5 09:58 id_rsa
+-rw-r--r-- 1 root root  565 May  5 09:58 id_rsa.pub
+
+
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_ssh/       
+[root@master ~]# cd ec2_ssh/
+[root@master ec2_ssh]# cp ../ec2_vars/*.tf .      
+[root@master ec2_ssh]# vi main.tf
+[root@master ec2_ssh]# cat main.tf
+resource "aws_key_pair" "example" {
+  key_name   = "${var.tags.Name}-kp"
+  public_key = file("/root/.ssh/id_rsa.pub")
+}
+
+resource "aws_instance" "example" {
+  ami           = var.ami
+  instance_type = var.instance_type
+  tags = var.tags
+  key_name = aws_key_pair.example.key_name
+}
+[root@master ec2_ssh]# terraform init         
+[root@master ec2_ssh]# terraform validate             
+[root@master ec2_ssh]# terraform plan                   
+[root@master ec2_ssh]# terraform apply -auto-approve                
+[root@master ec2_ssh]# ssh -i /root/.ssh/id_rsa ubuntu@PUBLIC_IP         
+
+###########################05-05-26#################################
+
+[root@master ec2_ssh]# terraform state list                 
+[root@master ec2_ssh]# terraform destroy -target=aws_instance.example            
+[root@master ec2_ssh]# terraform state list                   
+[root@master ec2_ssh]# terraform destroy -auto-approve               
+
+###########################05-05-26#################################
+
+Terraform Provisioners:
+
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_prov/      
+[root@master ~]# cd ec2_prov/
+[root@master ec2_prov]# cp -fr ../ec2_ssh/*.tf .   
+[root@master ec2_prov]# vi main.tf
+[root@master ec2_prov]# cat main.tf
+resource "aws_key_pair" "example" {
+  key_name   = "${var.tags.Name}-kp"
+  public_key = file("/root/.ssh/id_rsa.pub")
+}
+
+resource "aws_instance" "example" {
+  ami           = var.ami
+  instance_type = var.instance_type
+  tags = var.tags
+  key_name = aws_key_pair.example.key_name
+
+  provisioner "local-exec" {
+    command = "echo ${self.public_ip} > myoutfile"
+  }
+
+  provisioner "local-exec" {
+    command = "echo echo starting > myscript.sh ; echo sleep 20 >> myscript.sh ; echo echo running >> myscript.sh ; echo sleep 20 >> myscript.sh ; echo echo finished >> myscript.sh"
+  }
+
+  provisioner "file" {
+    source = "myscript.sh"
+    destination = "/tmp/myscript.sh"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      private_key = file("/root/.ssh/id_rsa")
+      host = self.public_ip
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "echo I am on REMOTE Machine Ec2 instance",
+      "chmod 755 /tmp/myscript.sh",
+      "/bin/sh /tmp/myscript.sh",
+    ]
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      private_key = file("/root/.ssh/id_rsa")
+      host = self.public_ip
+    }
+  }
+}
+[root@master ec2_prov]# terraform init            
+[root@master ec2_prov]# terraform validate            
+[root@master ec2_prov]# terraform plan             
+[root@master ec2_prov]# terraform apply -auto-approve           
+[root@master ec2_prov]# ls -ltr
+total 40
+-rw-r--r-- 1 root root  342 May  5 11:43 vars.tf
+-rw-r--r-- 1 root root  234 May  5 11:43 provider.tf
+-rw-r--r-- 1 root root   63 May  5 11:43 out.tf
+-rw-r--r-- 1 root root   14 May  5 12:27 myoutfile
+-rw-r--r-- 1 root root   59 May  5 12:27 myscript.sh
+-rw-r--r-- 1 root root 7037 May  5 12:31 terraform.tfstate
+-rw-r--r-- 1 root root 1130 May  5 12:35 main.tf
+[root@master ec2_prov]# ssh -i /root/.ssh/id_rsa ubuntu@PUBLIC_IP 'cat /tmp/myscript.sh'
+echo starting
+sleep 20
+echo running
+sleep 20
+echo finished
+
+###########################05-05-26#################################
+
+Terraform Count Loop:
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_count/      
+[root@master ~]# cd ec2_count/
+[root@master ec2_count]# cp -fr ../ec2_vars/*.tf .      
+
+[root@master ec2_count]# vi main.tf
+[root@master ec2_count]# cat main.tf
+#aws_instance.example[0]
+#aws_instance.example[1]
+#aws_instance.example[2]
+resource "aws_instance" "example" {
+  count = 3
+  ami           = var.ami
+  instance_type = var.instance_type
+  tags = { Name = "${var.tags.Name}-${count.index}" }
+  #sagar-vm-0,sagar-vm-1,sagar-vm-2
+}
+
+[root@master ec2_count]# vi out.tf
+[root@master ec2_count]# cat out.tf
+output "PublicIP" {
+  value = [
+    for x in aws_instance.example:
+      x.public_ip
+  ]
+}
+
+[root@master ec2_count]# terraform init    
+[root@master ec2_count]# terraform plan     
+[root@master ec2_count]# terraform apply -auto-approve    
+
+###########################05-05-26#################################
+
+Foreach Loop:
+
+[root@master ec2_foreach]# cd
+[root@master ~]# mkdir ec2_foreach/   
+[root@master ~]# cd ec2_foreach/
+[root@master ec2_foreach]# cp -fr ../ec2_count/*.tf .    
+            
+[root@master ec2_foreach]# vi main.tf
+[root@master ec2_foreach]# cat main.tf
+#aws_instance.example["dev"]
+#aws_instance.example["uat"]
+#aws_instance.example["prd"]
+resource "aws_instance" "example" {
+  for_each = { dev = "t2.nano", uat = "t2.micro", prd = "t2.small" }
+  ami           = var.ami
+  instance_type = each.value
+  tags = { Name = "${var.tags.Name}-${each.key}" }
+  #sagar-vm-dev,sagar-vm-uat,sagar-vm-prd
+}
+
+[root@master ec2_foreach]# terraform init         
+[root@master ec2_foreach]# terraform plan          
+[root@master ec2_foreach]# terraform apply -auto-approve         
+
+[root@master ec2_foreach]# terraform state list
+aws_instance.example["dev"]
+aws_instance.example["prd"]
+aws_instance.example["uat"]
+
+###########################05-05-26#################################
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_ifelse/   
+[root@master ~]# cd ec2_ifelse/
+[root@master ec2_ifelse]# cp -fr ../ec2_count/*.tf .    
+[root@master ec2_ifelse]# vi main.tf
+[root@master ec2_ifelse]# cat main.tf
+variable "env" {
+}
+
+resource "aws_instance" "example" {
+  count = "${ var.env == "dev" ? 1 : var.env == "uat" ? 2 : var.env == "prd" ? 3 : 0 }"
+  ami           = var.ami
+  instance_type = "${ var.env == "dev" ? "t2.nano" : var.env == "uat" ? "t2.micro" : var.env == "prd" ? "t2.small" : "t2.nano" }"
+  tags = { Name = "${var.tags.Name}-${var.env}-${count.index}" }
+}
+
+[root@master ec2_ifelse]# terraform init    
+[root@master ec2_ifelse]#             
+[root@master ec2_ifelse]# terraform apply --var=env="uat" -auto-approve            
+[root@master ec2_ifelse]# terraform apply --var=env="prd" -auto-approve             
+[root@master ec2_ifelse]# terraform apply --var=env="dev" -auto-approve              
+[root@master ec2_ifelse]# terraform apply --var=env="tuesday" -auto-approve            
+
+###########################06-05-26#################################
+
+Terraform Template:
+
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_template/     
+[root@master ~]# cd ec2_template/
+[root@master ec2_template]# cp -fr ../ec2_ifelse/*.tf .      
+
+[root@master ec2_template]# vi envir
+[root@master ec2_template]# cat envir
+prd
+
+[root@master ec2_template]# vi main.tf
+[root@master ec2_template]# cat main.tf
+#trimspace(data.template_file.myenv.rendered)
+data "template_file" "myenv" {
+  template = file("envir")
+}
+
+resource "aws_instance" "example" {
+  count = "${ trimspace(data.template_file.myenv.rendered) == "dev" ? 1 : trimspace(data.template_file.myenv.rendered) == "uat" ? 2 : trimspace(data.template_file.myenv.rendered) == "prd" ? 3 : 0 }"
+  ami           = var.ami
+  instance_type = "${ trimspace(data.template_file.myenv.rendered) == "dev" ? "t2.nano" : trimspace(data.template_file.myenv.rendered) == "uat" ? "t2.micro" : trimspace(data.template_file.myenv.rendered) == "prd" ? "t2.small" : "t2.nano" }"
+  tags = { Name = "${var.tags.Name}-${trimspace(data.template_file.myenv.rendered)}-${count.index}" }
+}
+
+[root@master ec2_template]# terraform init               
+[root@master ec2_template]# terraform plan                 
+[root@master ec2_template]# terraform apply -auto-approve        
+
+##########################06-05-2026######################################
+
+Reading JSON Data in Terraform:
+
+[root@master ~]# cd
+[root@master ~]# mkdir json_read/    
+[root@master ~]# cd json_read/
+
+[root@master json_read]# vi mydata.json
+[root@master json_read]# cat mydata.json
+{
+    "project": [
+        {
+            "user_name": "devuser",
+            "env": "dev"
+        },
+        {
+            "user_name": "prduser",
+            "env": "prd"
+        }
+    ]
+}
+
+[root@master json_read]# vi main.tf
+[root@master json_read]# cat main.tf
+locals {
+  #Convert JSON FORMAT to HCL Format
+  mydata = jsondecode(file("mydata.json"))
+}
+
+output "printdata" {
+  value = local.mydata
+}
+
+output "printdevuser" {
+  value = local.mydata.project.0.user_name
+}
+
+output "printprduser" {
+  value = local.mydata.project.1.user_name
+}
+
+[root@master json_read]# terraform apply -auto-approve   
+
+
+##########################06-05-2026######################################
+
+Fetching HTTP Data in Terraform:
+
+[root@master ~]# cd
+[root@master ~]# mkdir http_read/    
+[root@master ~]# cd http_read/
+
+[root@master http_read]# vi main.tf
+[root@master http_read]# cat main.tf
+data "http" "myexh" {
+  url = "https://open.er-api.com/v6/latest/USD"
+  request_headers = {
+    Accept = "application/json"
+  }
+}
+
+locals {
+  myexh = jsondecode(data.http.myexh.response_body)
+}
+
+output "myHCLdata" {
+  value = local.myexh
+}
+
+output "INRRate" {
+  value = local.myexh.rates.INR
+}
+
+[root@master http_read]# terraform init                  
+[root@master http_read]# terraform apply -auto-approve    
+
+##########################06-05-2026######################################
+
+Defining a Module:
+
+[root@master ~]# cd
+[root@master ~]# mkdir -p terraform_modules/webserver
+[root@master ~]# cd terraform_modules/webserver/
+[root@master webserver]# cp -fr ../../ec2_vars/*.tf .
+[root@master webserver]# ls -ltr
+total 16
+-rw-r--r-- 1 root root 118 May  6 12:11 main.tf
+-rw-r--r-- 1 root root 342 May  6 12:11 vars.tf
+-rw-r--r-- 1 root root 234 May  6 12:11 provider.tf
+-rw-r--r-- 1 root root  63 May  6 12:11 out.tf
+[root@master webserver]# pwd
+/root/terraform_modules/webserver
+
+
+##########################06-05-2026######################################
+
+Calling a Module:
+
+[root@master ~]# cd
+[root@master ~]# mkdir calling_module/    
+[root@master ~]# cd calling_module/
+
+[root@master calling_module]# vi call.tf
+[root@master calling_module]# cat call.tf
+module "mymodule" {
+  #calling the module with source
+  source = "/root/terraform_modules/webserver"
+
+  #overwriting variables of module
+  instance_type = "t2.small"
+  tags = { Name = "sagar-new-vm" }
+}
+
+output "PublicIPfromModule" {
+  value = module.mymodule.PublicIP
+}
+
+[root@master calling_module]# terraform init          
+[root@master calling_module]# terraform validate          
+[root@master calling_module]# terraform plan             
+[root@master calling_module]# terraform apply -auto-approve           
+
+
+##########################06-05-2026######################################
+
+Remote State Terraform:
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_remote_state/   
+[root@master ~]# cd ec2_remote_state/
+[root@master ec2_remote_state]# cp -fr ../ec2_vars/*.tf .     
+[root@master ec2_remote_state]# vi provider.tf
+[root@master ec2_remote_state]# cat provider.tf
+terraform {
+  backend "local" {
+    path = "/etc/mystatefile"
+  }
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "6.43.0"
+    }
+  }
+}
+
+provider "aws" {
+  region     = var.aws.region
+  access_key = var.aws.access_key
+  secret_key = var.aws.secret_key
+}
+
+[root@master ec2_remote_state]# terraform init     
+[root@master ec2_remote_state]# terraform apply -auto-approve    
+[root@master ec2_remote_state]# ls -ltr /etc/mystatefile
+-rw-r--r-- 1 root root 5507 May  6 13:20 /etc/mystatefile
+[root@master ec2_remote_state]# terraform apply -auto-approve   
+
+##########################06-05-2026######################################
+
+Terraform Import:
+
+[root@master ~]# CREATE EC2 Server was already running and take its instance ID.
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_import/    
+[root@master ~]# cd ec2_import/
+[root@master ec2_import]# vi provider.tf
+[root@master ec2_import]# cat provider.tf
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "6.43.0"
+    }
+  }
+}
+
+provider "aws" {
+  region     = "ap-south-1"
+  access_key = "AKIATPWBFSSPFHLZIY5F"
+  secret_key = "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"
+}
+
+import {
+  id = "i-01923404110f6dd27"
+  to = aws_instance.myserver
+}
+[root@master ec2_import]# terraform init              
+[root@master ec2_import]# terraform plan -generate-config-out="main.tf"       
+[root@master ec2_import]# IN main.tf file, we commented primary_network_interface block, ipv6_addresses, ipv6_address_count, associate_public_ip_address           
+[root@master ec2_import]# terraform apply      
+[root@master ec2_import]# ls -ltr
+total 16
+-rw-r--r-- 1 root root  331 May  6 15:03 provider.tf
+-rw-r--r-- 1 root root 2631 May  6 15:09 main.tf
+-rw-r--r-- 1 root root 5425 May  6 15:10 terraform.tfstate
+[root@master ec2_import]# terraform apply       
+
+
+##########################06-05-2026######################################
+
+Null Resource, Time Sleep Resource and Explicit Dependency:
+
+[root@master ~]# cd
+[root@master ~]# mkdir time_depends/  
+[root@master ~]# cd time_depends/
+[root@master time_depends]# vi main.tf
+[root@master time_depends]# cat main.tf
+resource "null_resource" "next" {
+  depends_on = [time_sleep.wait_30_seconds]
+}
+
+resource "null_resource" "previous" {}
+
+resource "time_sleep" "wait_30_seconds" {
+  depends_on = [null_resource.previous]
+  create_duration = "30s"
+}
+#previous --> wait_30_seconds --> next
+[root@master time_depends]# terraform init    
+[root@master time_depends]# terraform apply -auto-approve   
+
+##########################07-05-2026######################################
+
+Terraform Workspaces:
+
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_workspace/      
+[root@master ~]# cd ec2_workspace/
+[root@master ec2_workspace]# cp -fr ../ec2_ifelse/*.tf .             
+[root@master ec2_workspace]# vi main.tf
+[root@master ec2_workspace]# cat main.tf
+resource "aws_instance" "example" {
+  count = "${ terraform.workspace == "dev" ? 1 : terraform.workspace == "uat" ? 2 : terraform.workspace == "prd" ? 3 : 0 }"
+  ami           = var.ami
+  instance_type = "${ terraform.workspace == "dev" ? "t2.nano" : terraform.workspace == "uat" ? "t2.micro" : terraform.workspace == "prd" ? "t2.small" : "t2.nano" }"
+  tags = { Name = "${var.tags.Name}-${terraform.workspace}-${count.index}" }
+}
+
+[root@master ec2_workspace]# terraform init          
+
+
+
+[root@master ec2_workspace]# terraform workspace new dev
+Created and switched to workspace "dev"!
+
+You're now on a new, empty workspace. Workspaces isolate their state,
+so if you run "terraform plan" Terraform will not see any existing state
+for this configuration.
+[root@master ec2_workspace]# terraform workspace show
+dev
+[root@master ec2_workspace]# terraform workspace list
+  default
+* dev
+
+[root@master ec2_workspace]# terraform apply -auto-approve
+
+
+
+
+[root@master ec2_workspace]# terraform workspace new uat
+Created and switched to workspace "uat"!
+
+You're now on a new, empty workspace. Workspaces isolate their state,
+so if you run "terraform plan" Terraform will not see any existing state
+for this configuration.
+[root@master ec2_workspace]# terraform workspace show
+uat
+[root@master ec2_workspace]# terraform workspace list
+  default
+  dev
+* uat
+
+[root@master ec2_workspace]# terraform apply -auto-approve
+
+
+
+
+[root@master ec2_workspace]# terraform workspace new prd
+Created and switched to workspace "prd"!
+
+You're now on a new, empty workspace. Workspaces isolate their state,
+so if you run "terraform plan" Terraform will not see any existing state
+for this configuration.
+[root@master ec2_workspace]# terraform workspace show
+prd
+[root@master ec2_workspace]# terraform workspace list
+  default
+  dev
+* prd
+  uat
+
+[root@master ec2_workspace]# terraform apply -auto-approve
+
+
+
+[root@master ec2_workspace]# terraform workspace list
+  default
+  dev
+* prd
+  uat
+
+[root@master ec2_workspace]# terraform workspace select dev
+Switched to workspace "dev".
+[root@master ec2_workspace]# terraform workspace list
+  default
+* dev
+  prd
+  uat
+
+
+
+[root@master ec2_workspace]# cd terraform.tfstate.d/
+[root@master terraform.tfstate.d]# ls -ltr
+total 0
+drwxr-xr-x 2 root root 31 May  7 10:08 dev
+drwxr-xr-x 2 root root 31 May  7 10:11 uat
+drwxr-xr-x 2 root root 31 May  7 10:13 prd
+[root@master terraform.tfstate.d]# ls -tlr dev/
+total 8
+-rw-r--r-- 1 root root 5622 May  7 10:08 terraform.tfstate
+[root@master terraform.tfstate.d]# ls -tlr uat/
+total 12
+-rw-r--r-- 1 root root 10745 May  7 10:11 terraform.tfstate
+[root@master terraform.tfstate.d]# ls -tlr prd
+total 16
+-rw-r--r-- 1 root root 15876 May  7 10:13 terraform.tfstate
+[root@master terraform.tfstate.d]# cd ..
+
+
+
+terraform workspace select dev
+terraform destroy -auto-approve
+terraform workspace select default
+terraform workspace delete dev
+
+
+terraform workspace select uat
+terraform destroy -auto-approve
+terraform workspace select default
+terraform workspace delete uat
+
+
+terraform workspace select prd
+terraform destroy -auto-approve
+terraform workspace select default
+terraform workspace delete prd
+
+##########################07-05-2026######################################
+
+
+Create AWS EC2(Ubuntu 26.04) instance using variables defined in vars.tf, having output Url/IP and SSH Login and running Web Server. Also, Create a Security group in ‘default VPC’ with inbound rules open for 22,80 ports and outbound open for ALL. Associate that SG with EC2 instance.
+Below is package/service name
+Apache Web Server: apache2
+
+
+
+[root@master ~]# cd
+[root@master ~]# mkdir ec2_webserver
+[root@master ~]# cd ec2_webserver/
+
+[root@master ec2_webserver]# vi apache.sh
+[root@master ec2_webserver]# cat apache.sh
+#!/bin/sh
+
+sudo apt-get update -y
+sudo apt-get install apache2 -y
+sudo systemctl restart apache2
+sudo systemctl enable apache2
+
+
+[root@master ec2_webserver]# vi vars.tf
+[root@master ec2_webserver]# cat vars.tf
+variable "aws" {
+  type = map
+  default = {
+    region = "ap-south-1",
+    access_key = "AKIATPWBFSSPFHLZIY5F",
+    secret_key = "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"
+  }
+}
+
+variable "ami" {
+  default = "ami-07a00cf47dbbc844c"
+}
+
+variable "instance_type" {
+  default = "t2.micro"
+}
+
+variable "tags" {
+  default = { Name = "sagar-web" }
+}
+
+
+[root@master ec2_webserver]# vi provider.tf
+[root@master ec2_webserver]# cat provider.tf
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "6.43.0"
+    }
+  }
+}
+
+provider "aws" {
+  region     = var.aws.region
+  access_key = var.aws.access_key
+  secret_key = var.aws.secret_key
+}
+
+
+[root@master ec2_webserver]# vi out.tf
+[root@master ec2_webserver]# cat out.tf
+output "PublicIP" {
+  value = aws_instance.web.public_ip
+}
+
+
+[root@master ec2_webserver]# vi main.tf
+[root@master ec2_webserver]# cat main.tf
+resource "aws_security_group" "web" {
+  name        = "${var.tags.Name}-sg"
+  tags = {
+    Name = "${var.tags.Name}-sg"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "in22" {
+  security_group_id = aws_security_group.web.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 22
+  ip_protocol       = "tcp"
+  to_port           = 22
+}
+
+resource "aws_vpc_security_group_ingress_rule" "in80" {
+  security_group_id = aws_security_group.web.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 80
+  ip_protocol       = "tcp"
+  to_port           = 80
+}
+
+resource "aws_vpc_security_group_egress_rule" "outAll" {
+  security_group_id = aws_security_group.web.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1" # semantically equivalent to all ports
+}
+
+resource "aws_key_pair" "web" {
+  key_name   = "${var.tags.Name}-kp"
+  public_key = file("/root/.ssh/id_rsa.pub")
+}
+
+resource "aws_instance" "web" {
+  ami           = var.ami
+  instance_type = var.instance_type
+  tags = var.tags
+  key_name = aws_key_pair.web.key_name
+  user_data = file("apache.sh")
+  vpc_security_group_ids = [aws_security_group.web.id]
+}
+
+
+[root@master ec2_webserver]# terraform init      
+[root@master ec2_webserver]# terraform validate      
+[root@master ec2_webserver]# terraform plan            
+[root@master ec2_webserver]# terraform apply -auto-approve          
+
+
+Check in Chrome Browser http://PUBLIC_IP. It will display Apache Default Page.
+
+##########################07-05-2026######################################
+
+Azure Access:
+
+[root@master ~]# cd
+[root@master ~]# wget https://atgensoft.com/training/azure_access_04052026.zip        
+[root@master ~]# unzip azure_access_04052026.zip         
+[root@master ~]# cat /root/azure_access_04052026/client_id
+77b47150-a882-4a83-9b7c-8fe59454b077
+[root@master ~]# cat /root/azure_access_04052026/tenant_id
+163a7f66-76d2-4e72-8d8f-013b1c7fa5e7
+[root@master ~]# cat /root/azure_access_04052026/sub_id
+67905f55-264e-4b7f-a516-d79f68610a45
+[root@master ~]# ls -ltr /root/azure_access_04052026/mycert.pfx
+-rwx------ 1 root root 4101 May  6 17:25 /root/azure_access_04052026/mycert.pfx
+
+##########################07-05-2026######################################
+
+
+Create an Azure Machine(Ubuntu 22.04) instance using terraform variables defined in vars.tf, having output Url/IP and Port and running Web Server.
+
+
+[root@master ~]# cd
+[root@master ~]# mkdir azure_webserver/        
+[root@master ~]# cd azure_webserver/
+[root@master azure_webserver]# vi apache.sh
+[root@master azure_webserver]# cat apache.sh
+#!/bin/sh
+
+sudo apt-get update -y
+sudo apt-get install apache2 -y
+sudo systemctl restart apache2
+sudo systemctl enable apache2
+
+
+[root@master azure_webserver]# vi vars.tf
+[root@master azure_webserver]# cat vars.tf
+variable "prefix" {
+  default = "sagar-web"
+}
+
+
+[root@master azure_webserver]# vi provider.tf
+[root@master azure_webserver]# cat provider.tf
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "4.71.0"
+    }
+  }
+}
+
+provider "azurerm" {
+  features {}
+
+  client_id                   = "77b47150-a882-4a83-9b7c-8fe59454b077"
+  client_certificate_path     = "/root/azure_access_04052026/mycert.pfx"
+  tenant_id                   = "163a7f66-76d2-4e72-8d8f-013b1c7fa5e7"
+  subscription_id             = "67905f55-264e-4b7f-a516-d79f68610a45"
+}
+
+
+
+[root@master azure_webserver]# vi out.tf
+[root@master azure_webserver]# cat out.tf
+output "PublicIP" {
+  value = azurerm_linux_virtual_machine.web.public_ip_address
+}
+
+
+
+[root@master azure_webserver]# vi main.tf
+[root@master azure_webserver]# cat main.tf
+resource "azurerm_resource_group" "web" {
+  name     = "${var.prefix}-rg"
+  location = "Central India"
+}
+
+resource "azurerm_network_security_group" "web" {
+  name                = "${var.prefix}-sg"
+  location            = azurerm_resource_group.web.location
+  resource_group_name = azurerm_resource_group.web.name
+
+  security_rule {
+    name                       = "inrule"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+resource "azurerm_virtual_network" "web" {
+  name                = "${var.prefix}-vnet"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.web.location
+  resource_group_name = azurerm_resource_group.web.name
+}
+
+resource "azurerm_subnet" "web" {
+  name                 = "${var.prefix}-snet"
+  resource_group_name  = azurerm_resource_group.web.name
+  virtual_network_name = azurerm_virtual_network.web.name
+  address_prefixes     = ["10.0.2.0/24"]
+}
+
+resource "azurerm_public_ip" "web" {
+  name                = "${var.prefix}-pubip"
+  resource_group_name = azurerm_resource_group.web.name
+  location            = azurerm_resource_group.web.location
+  allocation_method   = "Static"
+}
+
+resource "azurerm_network_interface" "web" {
+  name                = "${var.prefix}-nic"
+  location            = azurerm_resource_group.web.location
+  resource_group_name = azurerm_resource_group.web.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.web.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.web.id
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "web" {
+  network_interface_id      = azurerm_network_interface.web.id
+  network_security_group_id = azurerm_network_security_group.web.id
+}
+
+resource "azurerm_linux_virtual_machine" "web" {
+  name                = var.prefix
+  resource_group_name = azurerm_resource_group.web.name
+  location            = azurerm_resource_group.web.location
+  size                = "Standard_B1s"
+  admin_username      = "adminuser"
+  network_interface_ids = [
+    azurerm_network_interface.web.id,
+  ]
+
+  admin_ssh_key {
+    username   = "adminuser"
+    public_key = file("~/.ssh/id_rsa.pub")
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-jammy"
+    sku       = "22_04-lts"
+    version   = "latest"
+  }
+
+  user_data = filebase64("apache.sh")
+}
+
+
+
+[root@master azure_webserver]# terraform init                 
+[root@master azure_webserver]# terraform validate               
+[root@master azure_webserver]# terraform plan                     
+[root@master azure_webserver]# terraform apply -auto-approve          
+
+
+Check http://PUBLIC_UP on Chrome Browser.
+ssh -i /root/.ssh/id_rsa adminuser@PUBLIC_IP
+
+
+##########################08-05-2026######################################
+
+Google Cloud Access:
+
+[root@master ~]# cd
+[root@master ~]# wget https://atgensoft.com/training/google_access_04052026.zip             
+[root@master ~]# unzip google_access_04052026.zip                   ^C
+[root@master ~]# ls -tlr /root/google_access_04052026/ibm-terraform-04052026-bcfac690708d.json
+-rw-r--r-- 1 root root 2378 May  7 15:59 /root/google_access_04052026/ibm-terraform-04052026-bcfac690708d.json
+
+##########################08-05-2026######################################
+
+
+[root@master ~]# cd
+[root@master ~]# mkdir gcp_web/     
+[root@master ~]# cd gcp_web/
+
+[root@master gcp_web]# vi vars.tf
+[root@master gcp_web]# cat vars.tf
+variable "prefix" {
+  default = "sagar-web"
+}
+
+[root@master gcp_web]# vi provider.tf
+[root@master gcp_web]# cat provider.tf
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "7.31.0"
+    }
+  }
+}
+
+provider "google" {
+  credentials = file("/root/google_access_04052026/ibm-terraform-04052026-bcfac690708d.json")
+  project = "ibm-terraform-04052026"
+  region  = "asia-south1"
+  zone    = "asia-south1-a"
+}
+
+[root@master gcp_web]# vi out.tf
+[root@master gcp_web]# cat out.tf
+output "PublicIP" {
+  value = google_compute_instance.web.network_interface.0.access_config.0.nat_ip
+}
+
+[root@master gcp_web]# vi main.tf
+[root@master gcp_web]# cat main.tf
+resource "google_compute_firewall" "web" {
+  name        = "${var.prefix}-fw"
+  network     = "default"
+
+  allow {
+    protocol  = "tcp"
+    ports     = ["80", "22"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags = [var.prefix]
+}
+
+resource "google_compute_instance" "web" {
+  name         = var.prefix
+  machine_type = "e2-micro"
+
+  tags = [var.prefix]
+
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-2404-lts-amd64"
+    }
+  }
+
+  network_interface {
+    network = "default"
+
+    access_config {
+      // Ephemeral public IP
+    }
+  }
+
+  metadata = {
+    ssh-keys = "adminuser:${file("/root/.ssh/id_rsa.pub")}"
+  }
+
+  metadata_startup_script = file("apache.sh")
+}
+
+[root@master gcp_web]# vi apache.sh
+[root@master gcp_web]# cat apache.sh
+#!/bin/sh
+
+sudo apt-get update -y
+sudo apt-get install apache2 -y
+sudo systemctl restart apache2
+sudo systemctl enable apache2
+
+[root@master gcp_web]# terraform init   
+[root@master gcp_web]# terraform validate    
+[root@master gcp_web]# terraform plan       
+[root@master gcp_web]# terraform apply -auto-approve     
+
+
+You can login to VM with ssh -i /root/.ssh/id_rsa adminuser@PUBLIC_IP
+And check Chrome Browser for http://PUBLIC_IP
+
+##########################08-05-2026######################################
+
+https://atgensoft.com/training/JenkinsSetup.zip
+
+############################08-05-2026#######################################
+
+Jenkins Install Steps:
+
+0) cd 
+1) wget https://atgensoft.com/training/JenkinsSetup.zip
+2) unzip JenkinsSetup.zip
+3) cd JenkinsSetup
+4) ./jenkins_install.sh
+
+
+############################08-05-2026#######################################
+
+Update Jenkins(Java 21):
+
+5) cd 
+6) rm -fr JenkinsSetup.zip JenkinsSetup
+7) wget https://atgensoft.com/training/JenkinsSetup.zip
+8) cd JenkinsSetup
+9) ./jenkins_install.sh
+
+############################08-05-2026#######################################
+
+Open Link http://192.168.209.128:8080/ in Chrome Browser on Alchemy Lab machine.
+
+############################08-05-2026#######################################
+
+CI-CD Link:
+
+https://atgensoft.com/training/ibm-terraform-04052026-ci.pdf
+
+############################08-05-2026#######################################
+
+[root@master ~]# cd
+[root@master ~]# mkdir -p /etc/.aws
+[root@master ~]# vi /etc/.aws/credentials
+[root@master ~]# cat /etc/.aws/credentials
+[default]
+aws_access_key_id=AKIATPWBFSSPFHLZIY5F
+aws_secret_access_key=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
+
+###########################08-05-2026########################################
+
+Generate SSH KeyPair for "jenkins" user:
+
+
+[root@master ~]# su - jenkins
+[jenkins@master ~]$ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/var/lib/jenkins/.ssh/id_rsa):
+Created directory '/var/lib/jenkins/.ssh'.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /var/lib/jenkins/.ssh/id_rsa
+Your public key has been saved in /var/lib/jenkins/.ssh/id_rsa.pub
+The key fingerprint is:
+SHA256:nmGEDKj5ql zEWU2P 7Bh1BjP1BOiA523AP5xxodSaU jenkins@master
+The key's randomart image is:
+ ---[RSA 3072]---- 
+|   ....= o o.    |
+|  . oo=.  o.     |
+| o .  B.* E.     |
+|o     .*o        |
+| .  . . S o      |
+|  .  . *.= .     |
+| .      B .      |
+|.  .   . o       |
+|o.. .   .        |
+ ----[SHA256]----- 
+
+
+###########################08-05-2026######################################
+
+
+Contact @ https://www.atgensoft.com/
+Linkedin: @atgensoft
+FaceBook: @atgensoft
+YouTube: @atgensoft
+Email: SAGAR.MEHTA@ATGENSOFT.COM
+Doc: https://atgensoft.com/learning/download.html
+Learning Code: ibm-terraform-04052026
+
+#######################################################################
+
+
